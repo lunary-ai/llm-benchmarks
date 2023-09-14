@@ -66,30 +66,6 @@ export default function Home({ prompts, models }) {
           the raw results.
         </p>
         <br />
-
-        <table style={{ maxWidth: 600 }}>
-          <th>
-            <p>
-              Edit: as this got popular, I added an email form to receive
-              notifications for future benchmark results:
-            </p>
-            <iframe
-              src="https://embeds.beehiiv.com/65bd6af1-2dea-417a-baf2-b65bc27e1610?slim=true"
-              height="52"
-              frameborder="0"
-              scrolling="no"
-              style={{
-                width: 400,
-                border: "none",
-                transform: "scale(0.8)",
-                transformOrigin: "left",
-              }}
-            ></iframe>
-            <br />
-            <small>(no spam, max 1 email per month)</small>
-          </th>
-        </table>
-        <br />
         <br />
         <p>
           {`view: `}
@@ -173,6 +149,31 @@ export default function Home({ prompts, models }) {
             </a>
           </li>
         </ul>
+        <br />
+        <br />
+        <table style={{ maxWidth: 600 }}>
+          <th>
+            <p>
+              Edit: as this got popular, I added an email form to receive
+              notifications for future benchmark results:
+            </p>
+            <iframe
+              src="https://embeds.beehiiv.com/65bd6af1-2dea-417a-baf2-b65bc27e1610?slim=true"
+              height="52"
+              frameborder="0"
+              scrolling="no"
+              style={{
+                width: 400,
+                border: "none",
+                transform: "scale(0.8)",
+                transformOrigin: "left",
+              }}
+            ></iframe>
+            <br />
+            <small>(no spam, max 1 email per month)</small>
+          </th>
+        </table>
+        <br />
       </main>
     </>
   )
