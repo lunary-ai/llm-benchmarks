@@ -1,7 +1,7 @@
 import PlausibleProvider from "next-plausible"
 
 import "@/styles/globals.css"
-import Head from "next/head"
+
 import Script from "next/script"
 
 export default function App({ Component, pageProps }) {
@@ -15,13 +15,6 @@ export default function App({ Component, pageProps }) {
       }}
       customDomain="benchmarks.llmonitor.com"
     >
-      <Head>
-        {/* Support embedding into HuggingFace */}
-        <Script
-          strategy="afterInteractive"
-          src="https://cdnjs.cloudflare.com/ajax/libs/iframe-resizer/4.3.1/iframeResizer.contentWindow.min.js"
-        />
-      </Head>
       <Component {...pageProps} />
       <footer>
         <br />
@@ -35,6 +28,12 @@ export default function App({ Component, pageProps }) {
         <a href="https://llmonitor.com" className="llmonitor" target="_blank">
           by 📈 llmonitor
         </a>
+
+        {/* Support embedding into HuggingFace */}
+        <Script
+          strategy="afterInteractive"
+          src="https://cdnjs.cloudflare.com/ajax/libs/iframe-resizer/4.3.1/iframeResizer.contentWindow.min.js"
+        />
       </footer>
     </PlausibleProvider>
   )
