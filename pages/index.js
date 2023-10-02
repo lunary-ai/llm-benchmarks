@@ -47,7 +47,7 @@ export default function Home({ prompts, models }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <main>
-        <h1>Asking 60+ LLMs a set of 20 questions</h1>
+        <h1>Crowdsourced LLM Benchmark</h1>
         <br />
         <p>
           Benchmarks like HellaSwag are a bit too abstract for me to get a sense
@@ -69,13 +69,13 @@ export default function Home({ prompts, models }) {
         <br />
         <p>
           {`view: `}
-          <a href="#" onClick={() => changeView("prompt")}>
-            all prompts
-          </a>{" "}
-          /{" "}
           <a href="#" onClick={() => changeView("model")}>
-            all models
-          </a>
+            models
+          </a>{" "}
+          /
+          <a href="#" onClick={() => changeView("prompt")}>
+            prompts
+          </a>{" "}
         </p>
         <br />
         {viewBy === "prompt" ? (
@@ -103,16 +103,22 @@ export default function Home({ prompts, models }) {
           </>
         ) : (
           <ul>
-            {models.map((model, i) => (
-              <li key={i}>
-                {model.name} -{" "}
-                <Link
-                  href={`/model/${model.api_id.split("/").pop().toLowerCase()}`}
-                >
-                  results
-                </Link>
-              </li>
-            ))}
+            {models
+              .score((s) => s.score)
+              .map((model, i) => (
+                <li key={i}>
+                  {model.name} -{" "}
+                  <Link
+                    href={`/model/${model.api_id
+                      .split("/")
+                      .pop()
+                      .toLowerCase()}`}
+                  >
+                    results
+                  </Link>{" "}
+                  - score: {model.score}
+                </li>
+              ))}
           </ul>
         )}
         <br />

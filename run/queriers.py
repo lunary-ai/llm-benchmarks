@@ -4,6 +4,8 @@ import json
 import requests
 from dotenv import load_dotenv
 
+from llmonitor import monitor
+
 load_dotenv()
 
 TOGETHER_API_KEY = os.getenv('TOGETHER_API_KEY')
@@ -14,6 +16,8 @@ OPEN_ROUTER_API_KEY = os.getenv('OPEN_ROUTER_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 MAX_TOKENS = 300
+
+monitor(openai)
 
 def together(model, params):
     def format_prompt(prompt, prompt_type):

@@ -3,3 +3,4 @@ pandas
 requests
 python-dotenv
 gradio
+llmonitor
