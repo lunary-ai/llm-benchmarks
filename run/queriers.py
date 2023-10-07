@@ -2,11 +2,21 @@ import openai
 import os
 import json
 import requests
-from dotenv import load_dotenv
-
 from llmonitor import monitor
+from hugchat import hugchat
+from hugchat.login import Login
+from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
 
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    wait_random_exponential,
+)  # for exponential backoff
+
+from dotenv import load_dotenv
 load_dotenv()
+
 
 TOGETHER_API_KEY = os.getenv('TOGETHER_API_KEY')
 COHERE_API_KEY = os.getenv('COHERE_API_KEY')
@@ -14,10 +24,50 @@ AI21_API_KEY = os.getenv('AI21_API_KEY')
 ALEPH_API_KEY = os.getenv('ALEPH_API_KEY')
 OPEN_ROUTER_API_KEY = os.getenv('OPEN_ROUTER_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 
-MAX_TOKENS = 300
+# Huggingface login credentials
+HUGGING_EMAIL = os.environ.get("HUGGING_EMAIL")
+HUGGING_PASSWORD = os.environ.get("HUGGING_PASSWORD")
+
+MAX_TOKENS = 600
 
 monitor(openai)
+
+
+# Log in to huggingface and grant authorization to huggingchat
+sign = Login(HUGGING_EMAIL, HUGGING_PASSWORD)
+cookie_path_dir = "./cookies"
+
+try:
+  cookies = sign.loadCookiesFromDir(cookie_path_dir) # This will detect if the JSON file exists, return cookies if it does and raise an Exception if it's not.
+
+except Exception as e:
+  print(e)
+  
+  # Save cookies to the local directory
+  sign.saveCookiesToDir(cookie_path_dir)
+  cookies = sign.login()
+
+chatbot = hugchat.ChatBot(cookies=cookies.get_dict())  # or cookie_path="usercookies/<email>.json"
+
+def hugchat_func(model, params):
+
+    # Create a new conversation
+    id = chatbot.new_conversation()
+    chatbot.change_conversation(id)
+
+    # get index from chatbot.llms of the model
+    index = [i for i, x in enumerate(chatbot.llms) if x == model['api_id']][0]
+
+    print(f"Switching to {index}")
+
+    # set the chatbot to the model
+    chatbot.switch_llm(index)
+
+    query_result = chatbot.query(params['text'], temperature=0, max_new_tokens=MAX_TOKENS, stop=params['stop'] if params.get('stop') else None)
+    
+    return query_result['text']
 
 def together(model, params):
     def format_prompt(prompt, prompt_type):
@@ -37,7 +87,7 @@ def together(model, params):
     data = {
         "model": model['api_id'],
         "prompt": format_prompt(params['text'], model['type']),
-        "stop": params['stop'] if model['type'] == "chat" else params.get('stop', None),
+        "stop": "\n<human>" if model['type'] == "chat" else params.get('stop', None),
         "temperature": 0,
         "max_tokens": MAX_TOKENS,
     }
@@ -71,6 +121,7 @@ def cohere(model, params):
 
     return json_response['generations'][0]['text']
 
+@retry(wait=wait_exponential(multiplier=1, min=4, max=16))
 def openai_func(model, params):
     
     openai.api_key = OPENAI_API_KEY
@@ -105,19 +156,39 @@ def ai21(model, params):
     return json_response['completions'][0]['data']['text']
 
 def openrouter(model, params):
-    openai.api_key = OPEN_ROUTER_API_KEY
-    openai.api_base ="https://openrouter.ai/api/v1"
-    
-    completion = openai.ChatCompletion.create(
-        messages=[{"role": "user", "content": params['text']}],
-        temperature=0,
-        model=model['api_id'],
-        max_tokens=MAX_TOKENS,
-        headers={"HTTP-Referer": "https://benchmarks.llmonitor.com"},
-        stop=[params['stop']] if params.get('stop') else []
+
+    response = requests.post(
+        url="https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "HTTP-Referer": 'https://benchmarks.llmonitor.com', # To identify your app. Can be set to localhost for testing
+            "Authorization": "Bearer " + OPEN_ROUTER_API_KEY
+        },
+        data=json.dumps({
+            "model": model['api_id'],
+            "temperature": 0,
+            "max_tokens": MAX_TOKENS,
+            "stop": [params['stop']] if params.get('stop') else [],
+            "messages": [ 
+                {"role": "user", "content": params['text']}
+            ]
+        })
     )
-    
-    return completion.choices[0].message.content
+
+    completion = response.json()
+
+    return completion["choices"][0]["message"]["content"]
+
+def anthropic_func(model,params):
+    anthropic = Anthropic(
+        api_key=ANTHROPIC_API_KEY
+    )
+    completion = anthropic.completions.create(
+        model=model['api_id'],
+        temperature=0,
+        max_tokens_to_sample=MAX_TOKENS,
+        prompt=f"{HUMAN_PROMPT} {params['text']}{AI_PROMPT}",
+    )
+    return completion.completion
 
 def alephalpha(model, params):
     options = {

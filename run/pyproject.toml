@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "benchmarks"
+version = "0.1.0"
+description = ""
+authors = ["vincelwt <vince@llmonitor.com>"]
+
+
+[tool.poetry.dependencies]
+python = "^3.9"
+openai = "^0.28.1"
+requests = "^2.31.0"
+python-dotenv = "^1.0.0"
+termcolor = "^2.3.0"
+llmonitor = "0.0.11"
+hugchat = {git = "https://github.com/Soulter/hugging-chat-api", rev = "master"}
+psycopg2-binary = "^2.9.9"
+anthropic = "^0.3.11"
+tenacity = "^8.2.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

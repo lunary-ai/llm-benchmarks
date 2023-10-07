@@ -1,53 +1,68 @@
 import sqlite3
 import time
 from termcolor import colored
-from llmonitor import agent
-from queriers import together, cohere, openai_func, openrouter, ai21, alephalpha
+import psycopg2
+from queriers import together, cohere, openai_func, openrouter, ai21, alephalpha, hugchat_func, anthropic_func
+import psycopg2.extras
+import psycopg2.pool 
 
-db = sqlite3.connect("./database.db")
-db.row_factory = sqlite3.Row
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
-cursor = db.cursor()
+# Connect to database
+PG_URI = os.environ.get("POSTGRES_URL")
+
+
+# Create a connection pool with a minimum of 2 connections and 
+#a maximum of 3 connections 
+pool = psycopg2.pool.SimpleConnectionPool(2, 10, dsn=PG_URI)
+
+#conn = psycopg2.connect(PG_URI)
+
+conn = pool.getconn()
+
+cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 def remove_end(s, suffix):
     if s.endswith(suffix):
         return s[:-len(suffix)]
     return s
 
-
 # Fetch models
-models = cursor.execute("SELECT * FROM models").fetchall()
-models = [dict(model) for model in models]
+cursor.execute("SELECT * FROM models")
+models = cursor.fetchall()
 
 # Fetch prompts
-prompts = cursor.execute("SELECT * FROM prompts").fetchall()
-prompts = [dict(prompt) for prompt in prompts]
+cursor.execute("SELECT * FROM prompts WHERE selected = true")
+prompts = cursor.fetchall()
 
 
 def get_results():
-    results = cursor.execute("SELECT * FROM results").fetchall()
-    print(results[0].keys())
-    return [dict(result) for result in results]
+    cursor.execute("SELECT * FROM results")
+    results = cursor.fetchall()
+    return results
 
 def insert_result(modelId, promptId, result, duration, rate):
     cursor.execute(
-        "INSERT INTO results (model, prompt, result, duration, rate) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO results (model, prompt, result, duration, rate) VALUES (%s, %s, %s, %s, %s)",
         (modelId, promptId, result, duration, rate)
     )
-    db.commit()
+    conn.commit()
     pass
 
 def check_if_results_exist(modelId, promptId):
-    results = cursor.execute(
-        "SELECT * FROM results WHERE model = ? AND prompt = ? LIMIT 1", (modelId, promptId)
-    ).fetchall()
+    cursor.execute(
+        "SELECT * FROM results WHERE model = %s AND prompt = %s LIMIT 1", (modelId, promptId)
+    )
+    results = cursor.fetchall()
     return len(results) > 0
 
 def ask_prompt(prompt, model):
     exists = check_if_results_exist(model["id"], prompt["id"])
 
     if exists:
-        print("Skipping, already got benchmark")
+        print(f"Skipping {model['name']}, already got benchmark")
         return
 
     mapping = {
@@ -56,6 +71,8 @@ def ask_prompt(prompt, model):
         "openai": openai_func,
         "openrouter": openrouter,
         "ai21": ai21,
+        "hugchat": hugchat_func,
+        "anthropic": anthropic_func,
         # "alephalpha": alephalpha # TODO: get a working API key
     }
 
@@ -65,7 +82,10 @@ def ask_prompt(prompt, model):
         print(f"No querier for {model['api']}")
         return
 
-    print(f"Querying {model['name']}")
+    print(colored("------------------------------------", 'white'))
+    print(colored(f"Querying {model['name']}", 'white'))
+    print(colored(f"Prompt: {prompt['text']}", 'white'))
+    print(colored("------------------------------------", 'white'))
 
     start_time = time.time()
 
@@ -82,40 +102,45 @@ def ask_prompt(prompt, model):
         duration = end_time - start_time
         chars_per_second = round(len(response_text) / duration, 2)
 
-        print("------------------------------------")
-        print(f"Result: {cleaned}")
-        print(f"Took {duration*1000} ms ({chars_per_second} chars/s)")
-        print("------------------------------------")
+        print(colored("------------------------------------", 'green'))
+        print(colored(f"Result: {cleaned}", 'green'))
+        print(colored(f"Took {duration*1000} ms ({chars_per_second} chars/s)", 'green'))
+        print(colored("------------------------------------", 'green'))
 
         insert_result(model["id"], prompt["id"], cleaned, duration*1000, chars_per_second)
 
     except Exception as e:
-        print(f"Error querying {model['name']}", e)
+        print(colored(f"Error querying {model['name']} ", 'red'), e)
 
 
 total_benchmarks = len(models) * len(prompts)
-print(f"Running {total_benchmarks} benchmarks")
 
-# # Run prompts
-# for model in models:
-#     if model["type"] == "language":
-#         continue
-#     for prompt in prompts:
-#         if prompt["type"] != "code" and model["type"] == "code":
-#             print("Skipping non-code benchmark for code model")
-#             continue
+print(colored(f"Running {total_benchmarks} benchmarks", 'blue'))
 
-#         ask_prompt(prompt, model)
+# Run prompts
+for model in models:
+
+    if model["type"] != "chat":
+        # Skip non-chat models for now 
+        continue
+
+    for prompt in prompts:
+        # if prompt["type"] != "code" and model["type"] == "code":
+            # print("Skipping non-code benchmark for code model")
+            # continue
+
+        ask_prompt(prompt, model)
 
 # Calculate scores
 results = get_results()
 
-@agent(name="RateResult")
+#@agent(name="RateResult")
 def rate_result(result):
-    rubrics = cursor.execute(
-        "SELECT * FROM rubrics WHERE prompt = ?",
+    cursor.execute(
+        "SELECT * FROM rubrics WHERE prompt = %s",
         (result["prompt"],)
-    ).fetchall()
+    )
+    rubrics = cursor.fetchall()
 
     has_rubrics = len(rubrics) > 0
 
@@ -128,7 +153,7 @@ def rate_result(result):
     print(colored(result["result"], 'cyan'))
     print(colored('---------------------------', 'white'))
     
-    score = None 
+    score = 0 
 
     for rubric in rubrics:
 
@@ -138,10 +163,11 @@ def rate_result(result):
             score = 0
         else:
             grading_text = (
-                f'You help verify that the following answer match this condition: the answer {rubric["grading"]}. Note: the answer might be imcomplete, in which case do your best to assess based on what the full result would be.\n\n'
+                f'You help me grade the answer of chatbots by verifying that they match this condition: the answer {rubric["grading"]}. Note: the answer might be imcomplete, in which case do your best to assess based on what the full result would be. Your rating needs to be very strict: if I ask that the answer is *exactly* some string and it contains more than that, then it\'s invalid.\n\n'
                 f'\n\n--START OF THE ANSWER--\n{result["result"]}\n--END OF THE ANSWER--\n\n'
-                f'Take a deep breath and explain step by step how you come to the conclusion.'
-                f'Finally, reply on the last line with YES if the following answer matches this condition (otherwies reply NO).'
+                # f'Take a deep breath and explain step by step how you come to the conclusion.'
+                # f'Finally, reply on the last line with YES if the following answer matches this condition (otherwies reply NO).'
+                f'Reply with YES if the text between START and END matches exactly the above condition (otherwise reply NO).'
             )
 
             # get gpt-4 model
@@ -164,17 +190,16 @@ def rate_result(result):
     
     return score
 
-
-
 for result in results:
-    if not result["score"]:
+    if result["score"] is None:
         score = rate_result(result)
 
         if score is not None:
             cursor.execute(
-                "UPDATE results SET score = ? WHERE id == ?",
+                "UPDATE results SET score = %s WHERE id = %s",
                 (score, result["id"])
             )
-            db.commit()
+            conn.commit()
 
-db.close() 
+cursor.close()
+conn.close()

@@ -9,15 +9,21 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "13.4.19",
+    "@auth/pg-adapter": "^0.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "next": "^13.5.4",
     "next-plausible": "^3.11.1",
     "openai": "^4.5.0",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "sqlite": "^5.0.1",
-    "sqlite3": "^5.1.6"
+    "postgres": "^3.3.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-google-recaptcha": "^3.1.0"
   },
   "prettier": {
     "semi": false
+  },
+  "devDependencies": {
+    "@types/react": "18.2.24",
+    "typescript": "5.2.2"
   }
 }
