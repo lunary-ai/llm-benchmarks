@@ -68,9 +68,8 @@ export default async function About() {
           </a>
         </li>
         <li>
-          I used a temperature of 0 and a max token limit of 600 for each test
-          (that's why a lot of answers are cropped). The rest are default
-          settings.
+          I used a temperature of 0 and a max token limit of 600 (that's why a
+          lot of answers are cropped). The rest are default settings.
         </li>
         <li>
           I made this with a mix of APIs from OpenRouter, TogetherAI, OpenAI,
