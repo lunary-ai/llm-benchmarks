@@ -1,6 +1,7 @@
 import Link from "next/link"
 import "@/styles/globals.css"
 import { Suspense } from "react"
+import PlausibleProvider from "next-plausible"
 
 export const metadata = {
   title: "LLMonitor Benchmarks",
@@ -10,6 +11,17 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <PlausibleProvider
+          domain="benchmarks.llmonitor.com"
+          scriptProps={{
+            src: "https://llmonitor.com/p/js/script.js",
+            // @ts-ignore
+            "data-api": "https://llmonitor.com/p/event",
+          }}
+          customDomain="benchmarks.llmonitor.com"
+        />
+      </head>
       <body>
         <main>
           <h1>LLMonitor Benchmarks</h1>
@@ -32,7 +44,7 @@ export default function RootLayout({ children }) {
           <p>
             Credit:{" "}
             <a href="https://twitter.com/vincelwt" target="_blank">
-              @vincelwt
+              @vincelwt\
             </a>{" "}
             /{" "}
             <a href="https://llmonitor.com" target="_blank">

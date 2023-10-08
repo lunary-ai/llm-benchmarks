@@ -1,4 +1,3 @@
-import Link from "next/link"
 import db, { getModels } from "@/utils/db"
 
 export default async function Comparison({ params }) {
@@ -54,9 +53,11 @@ export default async function Comparison({ params }) {
             </td>
             <td>
               <pre>{row.model1?.result?.trim()}</pre>
+              <p>{row.model1 ? `Score: ${row.model1?.score}` : "Not rated"}</p>
             </td>
             <td>
               <pre>{row.model2?.result?.trim()}</pre>
+              <p>{row.model2 ? `Score: ${row.model2?.score}` : "Not rated"}</p>
             </td>
           </tr>
         ))}

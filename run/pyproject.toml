@@ -16,6 +16,7 @@ hugchat = {git = "https://github.com/Soulter/hugging-chat-api", rev = "master"}
 psycopg2-binary = "^2.9.9"
 anthropic = "^0.3.11"
 tenacity = "^8.2.3"
+together = "^0.2.4"
 
 [build-system]
 requires = ["poetry-core"]

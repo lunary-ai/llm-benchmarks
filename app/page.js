@@ -1,17 +1,10 @@
-import db from "@/utils/db"
+import db, { getModels } from "@/utils/db"
 import Link from "next/link"
 
 export default async function Leaderboard() {
   const [potentialPoints] = await db`SELECT SUM(points) as total FROM rubrics`
 
-  const models = await db`
-    SELECT models.*, SUM(results.score) as total_score
-    FROM models
-    LEFT JOIN results ON models.id = results.model
-    GROUP BY models.id
-    ORDER BY total_score DESC;
-    `
-
+  const models = await getModels()
   return (
     <>
       <p>
@@ -49,7 +42,7 @@ export default async function Leaderboard() {
             .filter((s) => s.total_score)
             .map((model, i) => (
               <tr key={i}>
-                <td>{i + 1}</td>
+                <td>{model.rank}</td>
                 <td>{model.name}</td>
                 <td>
                   {parseInt((model.total_score / potentialPoints.total) * 100)}

@@ -2,13 +2,22 @@ import sqlite3
 import time
 from termcolor import colored
 import psycopg2
-from queriers import together, cohere, openai_func, openrouter, ai21, alephalpha, hugchat_func, anthropic_func
+from queriers import together_func, cohere, openai_func, openrouter, ai21, alephalpha, hugchat_func, anthropic_func
 import psycopg2.extras
 import psycopg2.pool 
+import openai
 
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
+from llmonitor import monitor, agent, tool
+from tenacity import (
+    retry,
+    wait_exponential,
+)  # for exponential backoff
+
+monitor(openai)
 
 # Connect to database
 PG_URI = os.environ.get("POSTGRES_URL")
@@ -66,7 +75,7 @@ def ask_prompt(prompt, model):
         return
 
     mapping = {
-        "together": together,
+        "together": together_func,
         "cohere": cohere,   # Add these functions to the mapping once they are translated
         "openai": openai_func,
         "openrouter": openrouter,
@@ -134,7 +143,42 @@ for model in models:
 # Calculate scores
 results = get_results()
 
-#@agent(name="RateResult")
+# @tool(name='grade_openai')
+@retry(wait=wait_exponential(multiplier=1, min=4, max=16))
+def grade_openai(rubric, result):
+    
+    openai.api_key = os.getenv('OPENAI_API_KEY')
+
+    messages = [{
+        "role": "system",
+        "content": "You help me grade the answer of chatbots by verifying that they match this assertion. Note: the answer might be imcomplete, in which case do your best to assess based on what the full result would be. Your rating needs to be very strict: if the condition is that the answer is *exactly* some string and it contains more than that, then it\'s invalid. Similarly, if the condition is that the answer mentions or contains something, then it\'s fine if there is also more than that. Reply with YES if the answer matches the assertion, and NO if it doesn\'t."
+    }, {
+        "role": "user", 
+        "content": 'Assertion: The answer mentions many countries not (officially) recognising taiwan as being independent\n\n--START OF THE ANSWER--\nTaiwan is a territory in East Asia with its own government and economy. It considers itself an independent country, officially known as the Republic of China (ROC). However, the People\'s Republic of China (PRC) claims Taiwan as a province of China. The international community is divided on the issue, with some countries recognizing Taiwan as an independent nation and others recognizing the PRC\'s claim.\n--END OF THE ANSWER--'
+    }, {
+        "role": "assistant",
+        "content": "YES"
+    }, {
+        "role": "user", 
+        "content": 'Assertion: The answer contains only a valid JSON and nothing else\n\n--START OF THE ANSWER--\nHere is the JSON array with the 5 planets closest to the sun:\n\n```json\n[\n{\n"planet": "Mercury",\n"distanceFromEarth": 77.3,\n"diameter": 4879,\n"moons": 0\n}\n]\n```\n--END OF THE ANSWER--'
+    }, {
+        "role": "assistant",
+        "content": "NO"
+    }, {
+        "role": "user",
+        "content": f"Assertion: The answer {rubric['grading']}\n\n--START OF THE ANSWER--\n{result['result']}\n--END OF THE ANSWER--\n\n"
+    }]
+
+    completion = openai.ChatCompletion.create(
+        model='gpt-4',
+        messages=messages,
+        temperature=0,
+        max_tokens=100
+    )
+
+    return completion.choices[0].message.content
+
+@agent(name="RateResult")
 def rate_result(result):
     cursor.execute(
         "SELECT * FROM rubrics WHERE prompt = %s",
@@ -162,20 +206,9 @@ def rate_result(result):
         if result["result"].strip() == "":
             score = 0
         else:
-            grading_text = (
-                f'You help me grade the answer of chatbots by verifying that they match this condition: the answer {rubric["grading"]}. Note: the answer might be imcomplete, in which case do your best to assess based on what the full result would be. Your rating needs to be very strict: if I ask that the answer is *exactly* some string and it contains more than that, then it\'s invalid.\n\n'
-                f'\n\n--START OF THE ANSWER--\n{result["result"]}\n--END OF THE ANSWER--\n\n'
-                # f'Take a deep breath and explain step by step how you come to the conclusion.'
-                # f'Finally, reply on the last line with YES if the following answer matches this condition (otherwies reply NO).'
-                f'Reply with YES if the text between START and END matches exactly the above condition (otherwise reply NO).'
-            )
 
-            # get gpt-4 model
-            gpt4 = next((item for item in models if item['api_id'] == 'gpt-4'), None)
             
-            prompt = { }
-
-            response_text = openai_func(gpt4, {"text": grading_text})
+            response_text = grade_openai(rubric, result)
 
             print(colored(f"-> {response_text}", 'yellow'))
 

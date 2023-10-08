@@ -2,17 +2,11 @@ import openai
 import os
 import json
 import requests
-from llmonitor import monitor
 from hugchat import hugchat
 from hugchat.login import Login
+import together
 from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
 
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    wait_random_exponential,
-)  # for exponential backoff
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -30,9 +24,7 @@ ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 HUGGING_EMAIL = os.environ.get("HUGGING_EMAIL")
 HUGGING_PASSWORD = os.environ.get("HUGGING_PASSWORD")
 
-MAX_TOKENS = 600
-
-monitor(openai)
+MAX_TOKENS = 700
 
 
 # Log in to huggingface and grant authorization to huggingchat
@@ -69,33 +61,29 @@ def hugchat_func(model, params):
     
     return query_result['text']
 
-def together(model, params):
-    def format_prompt(prompt, prompt_type):
-      if prompt_type == "language":
-          return f"Q: {prompt}\nA: "
-      if prompt_type == "code":
-          return f"# {prompt}"
-      if prompt_type == "chat":
-          return f"\n<human>: {prompt}\n<bot>: "
+def together_func(model, params):
+    # def format_prompt(prompt, prompt_type):
+    #   if prompt_type == "language":
+    #       return f"Q: {prompt}\nA: "
+    #   if prompt_type == "code":
+    #       return f"# {prompt}"
+    #   if prompt_type == "chat":
+        #   return f"<human>: {prompt}\n<bot>: "
       
-    url = "https://api.together.xyz/inference"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {TOGETHER_API_KEY}",
-    }
 
-    data = {
-        "model": model['api_id'],
-        "prompt": format_prompt(params['text'], model['type']),
-        "stop": "\n<human>" if model['type'] == "chat" else params.get('stop', None),
-        "temperature": 0,
-        "max_tokens": MAX_TOKENS,
-    }
+    together.api_key = TOGETHER_API_KEY
 
-    response = requests.post(url, headers=headers, data=json.dumps(data))
-    result = response.json()
+    # generate response
+    response = together.Complete.create(
+        model = model['api_id'],
+        prompt=f"<human>: {params['text']}\n<bot>:",
+        temperature=0,
+        max_tokens=MAX_TOKENS,
+        stop=["<human>", "<human>:","</s>", "<|end|>", "<|endoftext|>", "<bot>", "```\n```", "\nUser"]
+    )
 
-    return result['output']['choices'][0]['text'].rstrip(params['stop'])
+
+    return response['output']['choices'][0]['text'].rstrip(params['stop'])
 
 def cohere(model, params):
     options = {
@@ -121,7 +109,6 @@ def cohere(model, params):
 
     return json_response['generations'][0]['text']
 
-@retry(wait=wait_exponential(multiplier=1, min=4, max=16))
 def openai_func(model, params):
     
     openai.api_key = OPENAI_API_KEY
