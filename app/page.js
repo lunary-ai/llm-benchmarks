@@ -9,22 +9,22 @@ export default async function Leaderboard() {
     <>
       <p>
         Traditional LLMs benchmarks have drawbacks: they quickly become part of
-        training datasets and are hard to relate-to in terms of real-world
+        training datasets and are hard to relate to in terms of real-world
         use-cases.
       </p>
       <p>
-        I made this as an experiment to address these issues. Here the dataset
+        I made this as an experiment to address these issues. Here, the dataset
         is dynamic (changes every week) and composed of crowdsourced real-world
         prompts.
       </p>
       <p>
         We then use GPT-4 to grade each model's response against a set of
         rubrics (more details on the about page). The prompt dataset is easily
-        explorable as the score is only 1 dimension.
+        explorable.
       </p>
       <p>
-        The results are stored in Postgres database and those are the raw
-        results.
+        Everything is then stored in a Postgres database and this page shows the
+        raw results.
       </p>
 
       <br />
