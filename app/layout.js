@@ -43,7 +43,7 @@ export default function RootLayout({ children }) {
           <p>
             Credit:{" "}
             <a href="https://twitter.com/vincelwt" target="_blank">
-              @vincelwt\
+              @vincelwt
             </a>{" "}
             /{" "}
             <a href="https://llmonitor.com" target="_blank">
