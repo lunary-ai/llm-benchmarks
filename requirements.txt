@@ -1,0 +1,5 @@
+openai
+termcolor
+psycopg2-binary
+hugchat
+together
